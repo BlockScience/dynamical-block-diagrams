@@ -1,0 +1,502 @@
+\documentclass[twocolumn]{article}
+\usepackage{xypic}
+\usepackage{graphicx}
+\usepackage{enumerate}
+\usepackage{amssymb}
+\usepackage{biblatex}
+\usepackage{amsthm}
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{subcaption}
+\usepackage[section]{placeins}
+\usepackage[hidelinks]{hyperref}
+\usepackage[normalem]{ulem}
+
+\addbibresource{bib.bib}
+\newtheorem{lemma}{Lemma}
+\newcommand{\TightBracketB}[1]{\raisebox{0.25ex}{\scalebox{0.8}{\boldmath${#1\kern-0.65ex#1}$}}}%
+\newcommand*{\Inputs}[1]{\TightBracketB[#1\TightBracketB]}
+
+\begin{document}
+
+\section{Introduction}
+
+We describe a way block diagrams can be used to model dynamical systems. In Section \ref{sec:execution}, we describe how these diagrams can be executed. To execute a diagram, initial values need to be provided, so in Section \ref{sec:soundness} we discuss how determine if the provided initial conditions are valid without executing the diagram. We close with a discussion of related work and summary of results in Sections \ref{sec:related-work} and \ref{sec:conclusion}.
+
+\subsection{Block Diagrams}
+
+A block diagram is a set of blocks $B$ and a relation $W$ over $B$. If $(a, b)\in W$, then there is an arrow from block $a$ to block $b$. 
+
+
+\begin{figure}[h]
+\[
+    \xymatrix {
+        a \ar[r] \ar@/_/[dr] & e \\
+        & c
+    }
+\]
+    \caption{$B=\{a, e, c\}$ and $W=\{(a,e), (a, c)\}$.}
+    \label{fig:example1}
+\end{figure}
+
+When a diagram is executed, initial values are placed on a subset of blocks, then those values are propagated throughout according to: If all $b$'s inputs have values, then $b$ has a value. The set of blocks which take on values during propagation is denoted by a function $\text{p}:B\rightarrow B$. For example, if $I\subseteq B$ is the set of blocks with initial values, $\text{p}(I)$ is the set of blocks which receive values during propagation.
+
+\begin{figure}[h]
+\[
+    \xymatrix {
+        *++[o][F=]{a} \ar[r] \ar@/_/[dr] & *++[o][F-]{e} \ar[d] \\
+        & *++[o][F-]{c}
+    }
+\]
+    \caption{A diagram after propagation. Blocks circled once are elements of $\text{p}(I)$, blocks circled twice elements of $I$. That is, $I=\{a\}$ and $\text{p}(I)=\{e, c\}$.}
+    \label{fig:piisnoti}
+\end{figure}
+
+To be precise, the set of inputs to block $b$, denoted $\Inputs{b}$, is $\{a \mid (a, b)\in W\}$. And $b$ receives a value during propagation if $\Inputs{b}\setminus I\subseteq \text{p}(I)$. Notably, $b\in I\not\rightarrow b\in \text{p}(I)$, as shown in Figure \ref{fig:piisnoti}. We make use of this fact in Section \ref{sec:execution} to analyze loops.
+
+\subsection{Dynamical Systems}\label{sec:dynamical}
+
+The next state, $x^+$, of a dynamical system is a function of the previous state. That is, $x^+=f(x)$. There is a natural translation of dynamical systems to block diagrams, as in Figure \ref{fig:simpledynamical}.
+
+\begin{figure}[h]
+\[
+    \xymatrix {
+        f \ar@(r, u)[]
+    }
+\]
+    \caption{A block diagram of $x^+=f(x)$}
+    \label{fig:simpledynamical}
+\end{figure}
+
+For the dynamical system in Figure \ref{fig:simpledynamical} to be executable it needs an initial value. Letting $x_f$ denote this value, the first output of the system is $x^+=f(x_f)$, and thereafter its outputs are $f(f(x_f))$, $f(f(f(x_f)))$, ... Figure \ref{fig:simpleinitialization} shows how this initial value is denoted on a block diagram.
+
+\begin{figure}[h]
+\[
+    \xymatrix {
+        *++[o][F=]{f} \ar@(r, u)[]
+    }
+\]
+    \caption{Figure \ref{fig:simpledynamical} drawn with $I=\{f\}$.}
+    \label{fig:simpleinitialization}
+\end{figure}
+
+From visual inspection, it is clear Figure \ref{fig:simpleinitialization} will loop forever and Figure \ref{fig:piisnoti} will not. A natural question is, how to procedurally determine if an arbitrary diagram will loop forever or halt. This is answered in Section \ref{sec:execution}.
+
+A common extension to the dynamical system of Figure \ref{fig:simpledynamical} is of the form $x^+=f(x,u(h(x)))$, where $h(x)$ denotes what can be observed about the system and $u(h(x))$ the inputs to the system provided this observation. For example, $x$ might contain the location of a boat, $h(x)$ be its observed GPS coordinates, and $u(h(x))$ an adjustment to the rudders.
+
+\begin{figure}[h]
+\[
+    \xymatrix {
+        h \ar[r] & u \ar[d] \\
+        & f \ar@/^/[lu] \ar@(r, d)[]
+    }
+\]
+    \caption{A diagram of $x^+=f(x,u(h(x)))$.}
+    \label{fig:v2dynamical}
+\end{figure}
+
+Care must be taken when placing initial values on Figure \ref{fig:v2dynamical}. As illustrated in Figure \ref{fig:meow} for example, consider the case where an initial value is placed on only $h$, or on both $f$ and $u$.
+
+\begin{figure}[h]
+\[
+    \xymatrix {
+        *++[o][F=]{h} \ar[r] & u \ar[d] && h \ar[r] & *++[o][F=]{u} \ar[d] \\
+        & f \ar@/^/[lu] \ar@(r, d)[] && & *++[o][F=]{f} \ar@/^/[lu] \ar@(r, d)[]
+    }
+\]
+    \caption{Figure \ref{fig:v2dynamical} with $I=\{h\}$ (left) and $I=\{u, f\}$ (right).}
+    \label{fig:meow}
+\end{figure}
+
+When a value is placed on only $h$, $f$ doesn't receive a value. As for $f$ to take on a value, all of $f$'s inputs must have a value, but $f\in\Inputs{f}$ and $f\not\in I$, so not all of $f$'s inputs have a value. As not all blocks take on values, we say the diagram is under-determined with these initial conditions.
+
+When a value is placed on both $u$ and $f$, let $x_f$ denote the initial value of $f$ and $x_u$ the initial value of $u$. The first output of $f$ is then $f(x_f, x_u)$, but it is expected to be $f(x_f, u(h(x_f)))$. Without executing the diagram, we can't determine if $x_u\equiv u(h(x_f))$, so we would like to reject these initial conditions and say the diagram is over-determined.
+
+We call the initial conditions in Figure \ref{fig:meow} unsound and explore how to detect unsound initial conditions in Section \ref{sec:soundness}.
+
+\section{Execution}\label{sec:execution}
+
+Before giving a rigorous description of execution, consider the examples in Figures \ref{fig:noloop}, \ref{fig:noloop2loop}, and \ref{fig:multi-order}.
+
+\begin{figure}[h]
+\[
+\xymatrix{
+    *++[o][F=]{a} \ar[r] & b \ar@/_/[r] & *++[o][F=]{c} \ar@/_/[l] \\
+    *++[o][F=]{a} \ar[r]^{x_a} & b \ar@/_/[r]_{b(x_a, x_c)} & *++[o][F=]{c} \ar@/_/[l]_{x_c} \\
+    a \ar[r] & 1 \ar@/_/[r] & 2 \ar@/_/[l] \\
+}
+\]
+    \caption{Line 1: A diagram with $I=\{a, c\}$. Line 2: Each wire labeled with its block's output. Line 3: Blocks $b$ and $c$ are executed, then execution halts.}
+    \label{fig:noloop}
+\end{figure}
+
+\begin{figure}[h]
+\[
+\xymatrix{
+    *++[o][F=]{a} \ar[r] \ar@(r, u)[] & b \ar@/_/[r] & *++[o][F=]{c} \ar@/_/[l] \\
+    *++[o][F=]{3} \ar[r] \ar@(r, u)[] & 1 \ar@/_/[r] & *++[o][F=]{2} \ar@/_/[l] \\
+}
+\]
+    \caption{Adding $(a, a)$ to $W$ in the diagram from Figure \ref{fig:noloop} causes the diagram to loop forever.}
+    \label{fig:noloop2loop}
+\end{figure}
+
+\begin{figure}[h]
+\vspace{1em}
+\[
+\xymatrix{
+    *++[o][F=]{a} \ar[r]\ar@/_/[dr] & b \ar[r] & d \ar@/_2em/[ll] \\
+    & c \ar@/_/[ur]
+}
+\]
+    \caption{A diagram with multiple possible execution orders. $b$ may be executed before $c$, or $c$ before $b$.}
+    \label{fig:multi-order}
+\end{figure}
+
+Figure \ref{fig:noloop} shows a diagram which does not loop. After propagating the initial values from $a$ and $c$, $b$ can be executed, $b$'s new output then propagates into $c$ and $c$ is executed. Afterwards, $b$'s input from $c$ has a new value, but $b$'s input from $a$ doesn't, so $b$ cannot be executed again.
+
+Contrast this with Figure \ref{fig:noloop2loop} where $a$ feeds back into itself yielding $a(x_a)$ as its new value. In this case, all $b$'s inputs have new values, so $b$ executes again, and this repeats in a loop forever.
+
+In Figures \ref{fig:noloop} and \ref{fig:noloop2loop} there is only one sensible execution order. In Figure \ref{fig:multi-order}, $a$ then $b$ then $c$ then $d$, and $a$ then $c$ then $b$ then $d$ are both sensible. As $d$ doesn't output a new value until all its inputs do, either order yields the same result.
+
+We now formally describe execution.
+
+Over a block diagram, for some $I\subseteq B$ of blocks with initial values, $\text{p}(I)$ denotes the set of blocks which receive values during propagation. $\text{p}(I)$ is defined by a calculus $\mathfrak{C}$ with one rule.
+
+\[
+    \text{(P1)}\quad\begin{array}{l c l}
+    & \Inputs{b} \setminus I & \\
+    \hline\\[-1em]
+    & b &
+    \end{array} \quad\text{if } \Inputs{b}\not\equiv\varnothing
+\]
+
+The rule (P1) reads, for a block $b$ with a non-zero number of inputs, if $\Inputs{b}\setminus I \subseteq \text{p}(I)$, then $b\in \text{p}(I)$. Repeated applications of (P1) yield $\text{p}(I)$.
+
+\begin{figure}[h]
+\[
+    \xymatrix{
+    *++[o][F=]{a} \ar[r] & e & \text{p}(I)\equiv \{e\} \\
+    *++[o][F=]{a} \ar@/_/[r] & e \ar@/_/[l] & \text{p}(I)\equiv \{a, e\} \\
+    *++[o][F=]{a} \ar@/_/[r] & e \ar@(u, r)[] \ar@/_/[l] & \text{p}(I)\equiv \varnothing \\
+    a \ar@/_/[r] & *++[o][F=]{e} \ar@(u, r)[] \ar@/_/[l] & \text{p}(I)\equiv \{a, e\} \\
+    }
+\]
+    \caption{Example diagrams and the result of propagation. Blocks circled twice have initial values.}
+    \label{fig:pexamples}
+\end{figure}
+
+Figure \ref{fig:pexamples} shows four examples of propagation.
+
+Assertions about $\text{p}(I)$ can be proven by means of induction over $\mathfrak{C}$. To show a property $F$ holds for all elements of $\text{p}(I)$, it is sufficient to show $F$ holds when $\text{p}(I)\equiv \varnothing$, then to show if $F$ holds before (P1) is applied then $F$ holds afterwards. In principal, this is the same method of proof as induction over the natural numbers. For a detailed treatment of this method see Chapter II, Section 4 of \cite{Ebbinghaus-Flum-Thomas}.
+
+Towards an algorithm for determining execution order, we prove two lemmas about propagation.
+
+\begin{lemma}\label{lem:subset}
+$I\subseteq J \rightarrow \text{p}(I)\subseteq\text{p}(J)$.
+\end{lemma}
+\begin{proof}
+    Decreasing the number of blocks with initial values decreases the number of blocks which receive values during propagation. Let $F$ be the property $b\in \text{p}(I)\rightarrow b\in\text{p}(J)$. Base case, when $\text{p}(I)\equiv\varnothing$, $F$ is vacuously true. For the inductive step, assume $F$ holds before the application of (P1) and (P1) subsequently admits $b$.
+\begin{align*}
+    b \in \text{p}(I) &\rightarrow \Inputs{b} \setminus I \subseteq \text{p}(I)\quad &(\text{P1})\\
+    &\rightarrow \Inputs{b} \setminus I \subseteq \text{p}(J) \quad &(\text{Induction}) \\
+    &\rightarrow \Inputs{b} \setminus J \subseteq \text{p}(J) \quad &(I \subseteq J) \\
+    &\rightarrow b\in\text{p}(J)\quad &\text{(P1)} \\
+\end{align*}
+\end{proof}
+
+To represent a discrete dynamical system, let $V_t$ denote the set of blocks which have values propagated to them at time $t$. For a set of initial conditions $I$, $V_0 := \text{p}(I)$ and $V_{t+1} := \text{p}(\{b\mid b\in I \land b\in V_t\})$. That is, if a block with an initial value receives a new value during propagation, the new value is its value at time $t+1$ and propagation is performed again to compute the values of other blocks at $t+1$.
+
+\begin{lemma}\label{lem:fixedpoint}
+    $\exists t V_{t+1}\equiv V_t \leftrightarrow \forall n>0, V_{t+n}\equiv V_t$.
+\end{lemma}
+\begin{proof} Propagation has reached a fixed point. By induction.
+    \[
+       \begin{aligned}
+           \exists t V_{t+1}\equiv V_t \leftrightarrow V_{t+2} &\equiv \text{p}(\{b\mid b\in I \land b\in V_{t+1}\}) \\
+           &\equiv \text{p}(\{b\mid b\in I \land b\in V_{t}\}) \\
+           &\equiv V_{t+1} \\
+           &\equiv V_{t} \\ \\
+           V_{t+n+1} &\equiv \text{p}(\{b\mid b\in I \land b\in V_{t+n}\}) \\
+           &\equiv \text{p}(\{b\mid b\in I \land b\in V_{t}\}) \\
+           &\equiv V_{t+1} \\
+           &\equiv V_{t}
+           \end{aligned}
+    \]
+\end{proof}
+
+If a fixed point is reached during propagation and $V_t\not\equiv\varnothing$, then blocks will take on values for the rest of time, so we say the diagram does not halt. Otherwise, for a fixed point $V_t\equiv\varnothing$, no block will take on a value again, so we say the diagram halts.
+
+\begin{algorithm}[h]
+\caption{$\text{p}(I)$}
+\label{alg:propogation}
+\begin{algorithmic}[1]
+\State $S \gets \{b \mid \Inputs{b}\subseteq I \land \Inputs{b}\not\equiv\varnothing\}$
+\State $L \gets$ empty list
+\While{$S \not\equiv \varnothing $}
+    \State $b \gets$ any element of $S$
+    \State $L \gets L\cup b$
+    \State $S \gets S\setminus b$
+    
+    \For{each $b'$ where $b\in\Inputs{b'}$}
+        \If{$b'\not\in L\land\Inputs{b'}\subseteq L$}
+            \State $S \gets S\cup b'$
+        \EndIf
+    \EndFor
+\EndWhile
+\State \Return $L$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{figure}[H]
+\[
+\xymatrix{
+    *++[o][F=]{a} \ar[d] \ar@/^/[r] \ar@/_/@{<-}[r] & b \\
+    c \ar@/^/[r] \ar@/_/@{<-}[r] & *++[o][F=]{d}
+}
+\]
+    \caption{Algorithm \ref{alg:propogation} returns [c, b, a, d] when executed on the diagram.}
+    \label{fig:alg1example}
+\end{figure}
+
+Algorithm \ref{alg:propogation} describes a concrete implementation of the propogation function based on Kahn's algorithm for topological storting \cite{Kahn}.
+
+$S$ is initialized with all blocks satisfying P1 due to initial values alone. During each iteration of the loop, a block is removed from $S$ and appended to $L$; Then, all new blocks satisfying P1 are added to $S$. Once no more applications of P1 are possible, $L$ is returned.
+
+Notably, $L$ is a valid execution order for the diagram: If a block $b$ is added to $L$ either all its inputs have initial values or all its inputs have received values during propagation.
+
+\begin{algorithm}[h]
+\caption{Execution Order}
+\label{alg:halting}
+\begin{algorithmic}[1]
+\State \( V_t \gets p(I) \)
+\State \( L \gets \text{empty list} \)
+\Loop
+    \State \( V_{t+1} \gets p(\{b \mid b \in I \land b \in V_t\}) \)
+    \If {\( V_{t+1} \equiv \varnothing \)}
+        \State \Return (L + \(V_t\), \text{empty list})
+    \EndIf
+    \If {\( V_{t+1} \equiv V_t \)}
+        \State \Return (L, \(V_t\))
+    \EndIf
+    \State \(L \gets L + V_t\)
+    \State \( V_t \gets V_{t+1} \)
+\EndLoop
+\end{algorithmic}
+\end{algorithm}
+
+Algorithm \ref{alg:halting} builds off Algorithm \ref{alg:propogation} to determine the order a diagram executes. Per Lemma \ref{lem:fixedpoint}, the condition on line 5 being true means execution halts, and line 8 means execution will loop forever. A tuple containing a sequence of blocks to execute once and a sequence of blocks to execute in an infinite loop is returned.
+
+\begin{lemma}
+    Algorithm \ref{alg:halting} halts on finite diagrams.
+\end{lemma}
+\begin{proof}
+    Per Lemma \ref{lem:subset}, $V_{t+1}\subseteq V_t$ after execution of line 4. If the condition on line 8 is false, $V_{t+1}\subset V_t$. So each each iteration of the loop reduces the size of $V_t$ by at least one. And when $V_t$ is empty Algorithm \ref{alg:halting} halts, so Algorithm \ref{alg:halting} halts on finite diagrams.
+\end{proof}
+
+For $b\in B$ let $b(\dots)$ denote the result of evaluating $b$ on some inputs. If $b\in I$, let $x_b$ denote $b$'s initial value. Using this notation, diagrams can be compiled into imperative code using the execution order from Algorithm \ref{alg:halting}. We provide two examples for Figures \ref{fig:alg2example2} and \ref{fig:alg2example3}.
+
+\begin{figure}[h]
+\[
+    \xymatrix{
+        *++[o][F=]{a} \ar@(d, l)[] \ar@/^1em/[rr] \ar[r]  & b \ar[r] & c \ar[d] \\
+        *++[o][F=]{d} \ar@(d, l)[] \ar@/_1em/[rr] \ar[r] & e \ar[u] & *++[o][F=]{f} \ar[l]
+    }
+\]
+    \caption{Algorithm \ref{alg:halting} returns (empty list, [a, d, e, b, c, f]) when executed on the diagram.}
+    \label{fig:alg2example2}
+\end{figure}
+
+\begin{algorithm}[H]
+\caption{Figure \ref{fig:alg2example2} Compiled}
+\begin{algorithmic}[1]
+\Loop
+\State $a^+ \gets a(x_a)$
+\State $d^+ \gets d(x_d)$
+\State $x_e \gets e(x_d,x_f)$
+\State $x_b \gets b(x_a, x_e)$
+\State $x_c \gets c(x_a,x_b)$
+\State $f^+ \gets f(x_d, x_c)$
+\State $x_a, x_d, x_f \gets a^+, d^+, f^+$
+\EndLoop
+\end{algorithmic}
+\end{algorithm}
+
+\begin{figure}[h]
+\[
+    \xymatrix{
+        a \ar[r] & b \\
+        *++[o][F=]{c} \ar[u] & *++[o][F=]{d} \ar@(u, r)[] \\
+    }
+\]
+    \caption{Algorithm \ref{alg:halting} returns ([a, b, d], [d]) when executed on the diagram. A non-empty list is returned in the first position when analyzing diagrams with disjoint sequential and looping components.
+    }
+    \label{fig:alg2example3}
+\end{figure}
+
+\begin{algorithm}[H]
+\caption{Figure \ref{fig:alg2example3} Compiled}
+\begin{algorithmic}[1]
+\State $x_a \gets a(x_c)$
+\State $x_b \gets b(x_a)$
+\State $d^+ \gets d(x_d)$
+\State $x_d \gets d^+$
+\Loop
+\State $d^+ \gets d(x_d)$
+\State $x_d \gets d^+$
+\EndLoop
+\end{algorithmic}
+\end{algorithm}
+
+\section{Soundness}\label{sec:soundness}
+
+As discussed in Section \ref{sec:dynamical}, the canonical representation of a dynamical system is an equation of the form $x^+=f(x)$. That is, the next value of the system is a function of the previous one. Some initial conditions stop this from being the case. When this happens we say the diagram is unsound.
+
+Two ways to think intuitively about unsound diagrams are given in Figures \ref{fig:dynamicalexample} and \ref{fig:multi-value-soundness}. In Figure \ref{fig:dynamicalexample}, the next value of block $a$ is not a function of its previous value, which isn't consistent with a dynamical system. In Figure \ref{fig:multi-value-soundness}, the next value of $a$ is a function of its previous value, but block $c$ has multiple output values. As we want each block to have a one value at a time, this diagram is also unsound.
+
+\begin{figure}[h]
+\[
+\xymatrix{
+    *++[o][F=]{a} \ar@/_/[r]_{x_a} & *++[o][F=]{e} \ar@/_/[l]_{x_e}
+}
+\]
+    \caption{A diagram with unsound initial conditions where $x_a^+=a(x_e)$.}
+    \label{fig:dynamicalexample}
+\end{figure}
+
+\begin{figure}
+\[
+\xymatrix{
+*++[o][F=]{a} \ar@/^/[r]^{x_a} & e \ar@/^/[l] \ar@/^/[d] & *++[o][F=]{a} \ar@/^/[r] & e \ar@/^/[l]^{e(x_a)} \ar@/^/[d]^{e(x_a)} & *++[o][F=]{a} \ar@/^/[r] & e \ar@/^/[l]^{e(x_a)} \ar@/^/[d] \\
+  & *++[o][F=]{c} \ar@/^2em/[lu]^{x_c} && *++[o][F=]{c} \ar@/^2em/[lu]^{x_c} && *++[o][F=]{c} \ar@/^2em/[lu]|{x_c,c(e(x_a))}
+}
+\]
+    \caption{From left to right, three possible steps of execution. After step 2, $c$ has a new value on its inputs, yielding a new output after step 3, but then $c$ has multiple outputs.}
+    \label{fig:multi-value-soundness}
+\end{figure}
+
+The problems of Figures \ref{fig:dynamicalexample} and \ref{fig:multi-value-soundness} occur when a block both has an initial value and a value computable from other blocks with initial values. Thus, we can ensure every block has a single value by requiring
+
+\[
+b\in I\rightarrow b\not\in\text{p}(I\setminus b).
+\]
+
+However, a diagram like $\xymatrix@1{*++++[o][F=]{a} \ar[r] & c}$ satisfies this condition but has no feedback, and thus is an unsatisfactory model of a dynamical system of the form $x^+=f(x)$. To address this, we introduce the notion of an \textit{uninterrupted path} (abbreviated $\text{up}$) between two blocks. Over a diagram with initial conditions $I$, there is an uninterrupted path between $a$ and $b$ if there is a path between $a$ and $b$ which does not pass through any elements of $I$. Formally,
+\[
+    \text{up}(a,b,I) \leftrightarrow (a, b)\in W \lor \exists b'\in \Inputs{b}\setminus I, \text{up}(a,b',I).
+\]
+
+For example, $\xymatrix@1{*++++[o][F=]{a} \ar@/^/[r] & c \ar@/^/[l]}$ has an uninterrupted path from a to a, but not from c to c. In the sequel we prove two lemmas which relate uninterrupted paths to soundness, building up to a proof that
+
+\[
+(b\in I \rightarrow \text{up}(b, b, I))
+\rightarrow (b\in I\rightarrow b\not\in\text{p}(I\setminus b)).
+\]
+
+This being true means requiring each block with an initial value to feed back into itself is sufficient to ensure each block has one value at a time, making the diagram a satisfactory model of a dynamical system.
+
+\begin{lemma} \label{lem:upp}
+  $(a \not\in I \land \text{up}(a, b, I)) \rightarrow (b\in\text{p}(I) \rightarrow a\in\text{p}(I))$
+\end{lemma}
+\begin{proof}
+    Intuitively, in $\xymatrix@1{*++++[o][F=]{e} \ar[r] & a \ar[r] & b}$, if $b$ has a value propagated to it, then $a$ must also. The reason for the requirement $a\not\in I$ is to address diagrams like $\xymatrix@1{*++++[o][F=]{a} \ar[r] & b}$ where $b$ receives a value during propagation due to $a$ having an initial value, but $a$ does not. To prove this, we use induction which allows us to reason about cases where $a$ and $b$ are connected via a long uninterrupted path, as in $\xymatrix@1{*++++[o][F=]{e} \ar[r] & a \ar[r] & \dots \ar[r] & b}$.
+
+  By induction on the length of the path. For a path of length one, $(a, b)\in W$ so by definition $a\in\Inputs{b}$. So as $a\not\in I$, $a\in\Inputs{b}\setminus I$. Thus, by (P1) $b\in\text{p}(I)\rightarrow \Inputs{b}\setminus I\subseteq\text{p}(I)\rightarrow a\in\text{p}(I)$. For a path of length greater than one, $(a, b)\not\in W$ so
+  \[
+  \begin{aligned}
+      \text{up}(a, b, I)\land &b\in\text{p}(I)  \\ 
+      &\rightarrow \exists b'\in\Inputs{b}\setminus I, \text{up}(a, b', I) \land \Inputs{b}\setminus I\subseteq\text{p}(I) \\
+      &\rightarrow \text{up}(a, b', I) \land b'\in\text{p}(I) \\
+      &\rightarrow a\in\text{p}(I) \quad\quad\text{(Inductive hypothesis).}
+  \end{aligned}
+  \]
+\end{proof}
+
+\begin{lemma} \label{lem:soundness}
+    If $b\in I \rightarrow \text{up}(b, b, I)$, then $b\in I\rightarrow b\not\in\text{p}(I\setminus b)$.
+\end{lemma}
+\begin{proof}
+    Intuitively, in $\xymatrix@1{*++++[o][F=]{e} \ar[r] & b \ar@/_1em/[l]}$ because there is an uninterrupted path between $e$ and itself, Lemma \ref{lem:upp} approximately tells us, for $e$ to have a value $e$ must have a value, i.e. there is a cyclic dependency. As a result, removing the initial value on $e$ will cause $e$ to no longer have a value. If this is the case for all blocks with initial values, then the diagram is sound. To formally prove this, we once again use induction on the length of the uninterrupted path.
+
+        For some $I\subseteq B$ and $b\in I$, let $J=I\setminus b$ and let $\text{p}(J)$ be defined by $\mathfrak{C}$. We prove the predicate $b\not\in\text{p}(J)$ via induction on $\mathfrak{C}$: For the base case, if $\text{p}(J)\equiv\varnothing$ then the predicate holds vacuously. For the inductive step we once again consider paths of length one and greater than one.
+
+        For a path of length one,
+        \[
+        \begin{aligned}
+            b\in I\land (b, b)\in W &\rightarrow b\in \Inputs{b} \\
+            &\rightarrow b\in\Inputs{b}\setminus (I\setminus b). \\
+            &\rightarrow b\in\Inputs{b}\setminus J.
+        \end{aligned}
+        \]
+        Per the inductive hypothesis $b\not\in\text{p}(J)$, so as $b\in \Inputs{b}\setminus J$, $\Inputs{b}\setminus J\not\subseteq\text{p}(J)$, so $b$ will not be admitted by (P1).
+
+        For a path of length greater than one, as $J\subseteq I$ note
+        \[
+            \exists b'\in\Inputs{b}\setminus I, \text{up}(b, b', I)
+            \rightarrow \exists b'\in\Inputs{b}\setminus J, \text{up}(b, b', J).
+        \]
+        Towards a contradiction, before $b$ is admitted by (P1) suppose $\Inputs{b}\setminus J \subseteq \text{p}(J)$. Thus, for the same $b'$ as above, $b'\in\text{p}(J)$. So by Lemma \ref{lem:upp} $b\not\in J\land \text{up}(b, b', J) \land b'\in\text{p}(J) \rightarrow b\in \text{p}(J)$. But this contradicts the inductive hypothesis, $b\not\in\text{p}(J)$. So $\Inputs{b}\setminus J \not\subseteq \text{p}(J)$ and thus $b$ will not be admitted by (P1).
+\end{proof}
+
+To conclude our discussion of soundness, per Lemma \ref{lem:soundness}, to check if a diagram is sound we can check if $b\in I\rightarrow \text{up}(b, b, I)$ as follows: For each $b\in I$, check that $b$ is reachable from $b$ without passing over any elements of $I$. This can be accomplished with a graph traversal (for example, breadth-first search), which is modified to not pass over elements of $I$. If every $b\in I$ is reachable from itself via this traversal, the diagram is a satisfactory model of a dynamical system.
+
+\section{Related Work}\label{sec:related-work}
+
+Block diagrams as a notation for describing computation has found success in many domains from shader programming \cite{Blender} to signal processing \cite{Cycling74}. In fact, representing and simulating block diagrams of dynamical systems has found commercial success in, for example, Simulink by MathWorks \cite{Matlab}, released in 1984. However, these systems are proprietary, so it is difficult to know precisely what static analysis they perform.
+
+In the literature, our execution and static analysis methods resemble Synchronous Kahn Networks \cite{SyncKahn} and synchronous programming languages \cite{SynchronousProgrammingOfReactiveSystems} \cite{EDWARDS200321}. To sketch this equivalence, the blocks here can be thought of a processes in a Kahn Network which wait on all of their inputs and then yield exactly one output, and initial conditions can be modeled with the \texttt{pre} operator. Among other things, these models of computation make possible static analysis to ensure execution avoids multiple values being on a channel at once, as in Figure \ref{fig:multi-value-soundness}; static analysis to detect unbroken feedback loops \cite{SynchronousCausality}, like the one in Figure \ref{fig:simpledynamical}; And static analysis to compile diagrams to imperative code \cite{SyncKahn}.
+
+However, to the best of our knowledge this analysis has not been extended to detecting over-determined initialization, as in Figures \ref{fig:meow} (right) and \ref{fig:dynamicalexample}. Though this is not to say we are the first to identify and address this problem. Without purchasing a copy we cannot verify, but  Simulink likely performs similar checks with consistency checking enabled. \footnote{See this \href{https://www.mathworks.com/matlabcentral/answers/98768-why-does-my-simulink-model-generate-the-error-simulation-is-terminating-because-matlab-has-detected\#answer_108116}{\uline{MATLAB Central answer}}.} And as we will show, Wolfram System Modeler's \cite{SystemModeler} notion of over-determined initialization is likely nearly identical to ours.
+
+To see this, note how the Wolfram System Modeler documentation explains over-determined initialization.
+
+\begin{quote}
+    ``In overdetermined initialization, a subset of variables in the initialization problem is determined by more equations than the number of variables.'' \cite{WolframInitialization}
+\end{quote}
+
+Casting this in terms of our diagrams, we can view the initialization problem as solving for the value on each block's output, provided with known values from $I$. To show this by means of example, let $x_b$ denote the output of block $b$ and consider the over-determined diagram of Figure \ref{fig:wolfram-equivalence}.
+
+\begin{figure}[h]
+\[
+\xymatrix {
+*++[o][F=]{a} \ar[rd]^{x_a} \\
+*++[o][F=]{c} \ar[u]^{x_c} & b\ar[l]^{x_b}
+}
+\]
+    \caption{An over-determined diagram where the output of block $b$ is labeled $x_b$.}
+    \label{fig:wolfram-equivalence}
+\end{figure}
+
+For a block $b\in I$, let $k_b$ denote its initial value. With this notation, the initialization problem for Figure \ref{fig:wolfram-equivalence} becomes the problem of writing each variable in the following system of equations in terms of initial values and function applications.
+
+\[
+\begin{cases}
+    x_a - a(x_c) \equiv 0 \\
+    x_b - b(x_a) \equiv 0 \\
+    x_c - c(x_b) \equiv 0 \\
+    a(x_c) \equiv k_a \\
+    c(x_b) \equiv k_c \\
+\end{cases}
+\]
+
+However, in this system of equations we can express the value of $x_c$ two ways: $x_c\equiv c(b(k_a))$ and $x_c\equiv k_c$. Thus, we say the diagram is over-determined as ``a subset of variables ($x_c$) in the initialization problem is determined by more equations than the number of variables.'' This is equivalent to saying $c\in \text{p}(I\setminus c)$, which corresponds to our definition of soundness.
+
+\section{Conclusion}\label{sec:conclusion}
+
+We've discussed how to represent and execute block diagrams of dynamical systems. Section \ref{sec:execution} explored how to statically determine the execution order of a block diagram, then showed how to compile it to an imperative program. Section \ref{sec:soundness} showed how to statically detect potentially problematic initial conditions on a diagram. Future work could explore how to exploit opportunities for parallelism in diagram execution and integrate this work into modeling and simulation software like \cite{cadCAD.jl}.
+
+\begin{figure}[h]
+\[
+\xymatrix{
+b \\
+*++[o][F=]{a} \ar@/^/[r] \ar@/_/@{<-}[r] \ar@/^/[u] \ar@/_/@{<-}[u] & c \\
+}
+\]
+    \caption{Blocks $b$ and $c$ can be executed in parallel.}
+    \label{fig:soundness}
+\end{figure}
+
+\printbibliography
+
+\end{document}
