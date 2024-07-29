@@ -15,10 +15,16 @@
 
 \addbibresource{bib.bib}
 \newtheorem{lemma}{Lemma}
-\newcommand{\TightBracketB}[1]{\raisebox{0.25ex}{\scalebox{0.8}{\boldmath${#1\kern-0.65ex#1}$}}}%
-\newcommand*{\Inputs}[1]{\TightBracketB[#1\TightBracketB]}
+\newcommand*{\Inputs}[1]{N_{#1}}
 
 \begin{document}
+
+\LARGE
+\noindent Block Diagrams of \\ Dynamical Systems \par
+\vspace{0.68em}
+\large
+\noindent Zeke Medley \footnote[1]{BlockScience}
+\normalsize
 
 \section{Introduction}
 
@@ -40,7 +46,9 @@ A block diagram is a set of blocks $B$ and a relation $W$ over $B$. If $(a, b)\i
     \label{fig:example1}
 \end{figure}
 
-When a diagram is executed, initial values are placed on a subset of blocks, then those values are propagated throughout according to: If all $b$'s inputs have values, then $b$ has a value. The set of blocks which take on values during propagation is denoted by a function $\text{p}:B\rightarrow B$. For example, if $I\subseteq B$ is the set of blocks with initial values, $\text{p}(I)$ is the set of blocks which receive values during propagation.
+When a diagram is executed, initial values are placed on a subset of blocks, then those values are propagated throughout. A block receives a value if all of its inputs do. For a set $I\subseteq B$ of blocks with initial values, we denote the set of blocks which receive values during propagation $\text{p}(I)$.
+
+$\text{p}(I)$ is determined iteratively. For example, in $\xymatrix@1{*++++[o][F=]{a} \ar@/^/[r] & e \ar@/^/[l]}$, we say $a$ has an initial value, so as $a$ is $e$'s only input, $e\in \text{p}(I)$. Having determined $e$ receives a value during propagation, as $e$ is $a$'s only input, $a\in \text{p}(I)$. So, $\text{p}(I)\equiv \{a, e\}$.
 
 \begin{figure}[h]
 \[
@@ -53,7 +61,7 @@ When a diagram is executed, initial values are placed on a subset of blocks, the
     \label{fig:piisnoti}
 \end{figure}
 
-To be precise, the set of inputs to block $b$, denoted $\Inputs{b}$, is $\{a \mid (a, b)\in W\}$. And $b$ receives a value during propagation if $\Inputs{b}\setminus I\subseteq \text{p}(I)$. Notably, $b\in I\not\rightarrow b\in \text{p}(I)$, as shown in Figure \ref{fig:piisnoti}. We make use of this fact in Section \ref{sec:execution} to analyze loops.
+To be precise, the set of inputs to block $b$, denoted $\Inputs{b}$, is $\{a \mid (a, b)\in W\}$. $b$ receives a value during propagation if $\Inputs{b}\setminus I\subseteq \text{p}(I)$. Notably, $b\in I\not\rightarrow b\in \text{p}(I)$, as shown in Figure \ref{fig:piisnoti}. We make use of this fact in Section \ref{sec:execution} to analyze loops.
 
 \subsection{Dynamical Systems}\label{sec:dynamical}
 
@@ -81,9 +89,9 @@ For the dynamical system in Figure \ref{fig:simpledynamical} to be executable it
     \label{fig:simpleinitialization}
 \end{figure}
 
-From visual inspection, it is clear Figure \ref{fig:simpleinitialization} will loop forever and Figure \ref{fig:piisnoti} will not. A natural question is, how to procedurally determine if an arbitrary diagram will loop forever or halt. This is answered in Section \ref{sec:execution}.
+From visual inspection, it is clear Figure \ref{fig:simpleinitialization} will loop forever and Figure \ref{fig:piisnoti} will not. A natural question is, how to procedurally determine the order an arbitrary diagram will execute in, and, by extension, if it will loop forever or halt. This is answered in Section \ref{sec:execution}.
 
-A common extension to the dynamical system of Figure \ref{fig:simpledynamical} is of the form $x^+=f(x,u(h(x)))$, where $h(x)$ denotes what can be observed about the system and $u(h(x))$ the inputs to the system provided this observation. For example, $x$ might contain the location of a boat, $h(x)$ be its observed GPS coordinates, and $u(h(x))$ an adjustment to the rudders.
+A common extension to the dynamical system of Figure \ref{fig:simpledynamical} is of the form $x^+=f(x,u(h(x)))$, illustrated in Figure \ref{fig:v2dynamical}. $h(x)$ denotes what can be observed about the system and $u(h(x))$ the inputs to the system provided this observation. For example, $x$ might be the state of a boat, $h(x)$ its observed GPS coordinates, and $u(h(x))$ an adjustment to the rudders.
 
 \begin{figure}[h]
 \[
@@ -101,11 +109,11 @@ Care must be taken when placing initial values on Figure \ref{fig:v2dynamical}. 
 \begin{figure}[h]
 \[
     \xymatrix {
-        *++[o][F=]{h} \ar[r] & u \ar[d] && h \ar[r] & *++[o][F=]{u} \ar[d] \\
+        h \ar[r] & *++[o][F=]{u} \ar[d] && h \ar[r] & *++[o][F=]{u} \ar[d] \\
         & f \ar@/^/[lu] \ar@(r, d)[] && & *++[o][F=]{f} \ar@/^/[lu] \ar@(r, d)[]
     }
 \]
-    \caption{Figure \ref{fig:v2dynamical} with $I=\{h\}$ (left) and $I=\{u, f\}$ (right).}
+    \caption{Figure \ref{fig:v2dynamical} with $I=\{u\}$ (left) and $I=\{u, f\}$ (right).}
     \label{fig:meow}
 \end{figure}
 
@@ -113,7 +121,9 @@ When a value is placed on only $h$, $f$ doesn't receive a value. As for $f$ to t
 
 When a value is placed on both $u$ and $f$, let $x_f$ denote the initial value of $f$ and $x_u$ the initial value of $u$. The first output of $f$ is then $f(x_f, x_u)$, but it is expected to be $f(x_f, u(h(x_f)))$. Without executing the diagram, we can't determine if $x_u\equiv u(h(x_f))$, so we would like to reject these initial conditions and say the diagram is over-determined.
 
-We call the initial conditions in Figure \ref{fig:meow} unsound and explore how to detect unsound initial conditions in Section \ref{sec:soundness}.
+For another perspective on over-determined diagrams, consider $\xymatrix@1{*++++[o][F=]{a} \ar@/^/[r] & *++++[o][F=]{e} \ar@/^/[l]}$. Here, all of the inputs for $a$ and $e$ are available, so we can choose to execute either first. Letting $x_a$ and $x_e$ denote the initial values of $a$ and $e$ respectively: If $a$ is executed then $e$, the value output by $e$ is $e(a(x_e))$. However, if $e$ is executed first, the value outputted is $e(x_a)$. Without evaluating the blocks, we can't be sure $e(x_a)$ is equal to $e(a(x_e))$. So we say the diagram is unsound, as two seemingly valid execution orders can result in different outputs from the blocks.
+
+In Section \ref{sec:soundness} we explore how to detect over and under-determined initial conditions.
 
 \section{Execution}\label{sec:execution}
 
@@ -127,7 +137,7 @@ Before giving a rigorous description of execution, consider the examples in Figu
     a \ar[r] & 1 \ar@/_/[r] & 2 \ar@/_/[l] \\
 }
 \]
-    \caption{Line 1: A diagram with $I=\{a, c\}$. Line 2: Each wire labeled with its block's output. Line 3: Blocks $b$ and $c$ are executed, then execution halts.}
+    \caption{Top: A diagram with $I=\{a, c\}$. Middle: Each wire labeled with its first value. Bottom: Blocks $b$ and $c$ are executed, then execution halts.}
     \label{fig:noloop}
 \end{figure}
 
@@ -135,10 +145,10 @@ Before giving a rigorous description of execution, consider the examples in Figu
 \[
 \xymatrix{
     *++[o][F=]{a} \ar[r] \ar@(r, u)[] & b \ar@/_/[r] & *++[o][F=]{c} \ar@/_/[l] \\
-    *++[o][F=]{3} \ar[r] \ar@(r, u)[] & 1 \ar@/_/[r] & *++[o][F=]{2} \ar@/_/[l] \\
+    3 \ar[r] \ar@(r, u)[] & 1 \ar@/_/[r] & 2 \ar@/_/[l] \\
 }
 \]
-    \caption{Adding $(a, a)$ to $W$ in the diagram from Figure \ref{fig:noloop} causes the diagram to loop forever.}
+    \caption{Top: Adding $(a, a)$ to $W$ in the diagram from Figure \ref{fig:noloop} causes it to loop forever. Bottom: A possible execution order.}
     \label{fig:noloop2loop}
 \end{figure}
 
@@ -158,7 +168,7 @@ Figure \ref{fig:noloop} shows a diagram which does not loop. After propagating t
 
 Contrast this with Figure \ref{fig:noloop2loop} where $a$ feeds back into itself yielding $a(x_a)$ as its new value. In this case, all $b$'s inputs have new values, so $b$ executes again, and this repeats in a loop forever.
 
-In Figures \ref{fig:noloop} and \ref{fig:noloop2loop} there is only one sensible execution order. In Figure \ref{fig:multi-order}, $a$ then $b$ then $c$ then $d$, and $a$ then $c$ then $b$ then $d$ are both sensible. As $d$ doesn't output a new value until all its inputs do, either order yields the same result.
+In Figures \ref{fig:noloop} and \ref{fig:noloop2loop} there is only one sensible execution order. In Figure \ref{fig:multi-order}, $a$ then $b$ then $c$ then $d$, and $a$ then $c$ then $b$ then $d$ are both sensible. As $d$ doesn't output a new value until all its inputs do, either order yields the same result. When multiple orders are valid, our algorithm for determining execution picks one arbitrarily.
 
 We now formally describe execution.
 
@@ -172,7 +182,7 @@ Over a block diagram, for some $I\subseteq B$ of blocks with initial values, $\t
     \end{array} \quad\text{if } \Inputs{b}\not\equiv\varnothing
 \]
 
-The rule (P1) reads, for a block $b$ with a non-zero number of inputs, if $\Inputs{b}\setminus I \subseteq \text{p}(I)$, then $b\in \text{p}(I)$. Repeated applications of (P1) yield $\text{p}(I)$.
+The rule (P1) reads, for a block $b$ with a non-zero number of inputs, if $\Inputs{b}\setminus I \subseteq \text{p}(I)$, then $b\in \text{p}(I)$. Repeated applications of (P1) yield $\text{p}(I)$. Figure \ref{fig:pexamples} shows four examples of $\text{p}(I)$.
 
 \begin{figure}[h]
 \[
@@ -187,8 +197,6 @@ The rule (P1) reads, for a block $b$ with a non-zero number of inputs, if $\Inpu
     \label{fig:pexamples}
 \end{figure}
 
-Figure \ref{fig:pexamples} shows four examples of propagation.
-
 Assertions about $\text{p}(I)$ can be proven by means of induction over $\mathfrak{C}$. To show a property $F$ holds for all elements of $\text{p}(I)$, it is sufficient to show $F$ holds when $\text{p}(I)\equiv \varnothing$, then to show if $F$ holds before (P1) is applied then $F$ holds afterwards. In principal, this is the same method of proof as induction over the natural numbers. For a detailed treatment of this method see Chapter II, Section 4 of \cite{Ebbinghaus-Flum-Thomas}.
 
 Towards an algorithm for determining execution order, we prove two lemmas about propagation.
@@ -197,7 +205,9 @@ Towards an algorithm for determining execution order, we prove two lemmas about 
 $I\subseteq J \rightarrow \text{p}(I)\subseteq\text{p}(J)$.
 \end{lemma}
 \begin{proof}
-    Decreasing the number of blocks with initial values decreases the number of blocks which receive values during propagation. Let $F$ be the property $b\in \text{p}(I)\rightarrow b\in\text{p}(J)$. Base case, when $\text{p}(I)\equiv\varnothing$, $F$ is vacuously true. For the inductive step, assume $F$ holds before the application of (P1) and (P1) subsequently admits $b$.
+    Intuitively, decreasing the number of blocks with initial values will not increase the number of blocks which receive values during propagation. Formally, let $F$ be the property $b\in \text{p}(I)\rightarrow b\in\text{p}(J)$. Evidently, if $F$ is true, then $\text{p}(I)\subseteq\text{p}(J)$.
+    
+    Base case, when $\text{p}(I)\equiv\varnothing$, $F$ is vacuously true. For the inductive step, assume $F$ holds before the application of (P1) and (P1) subsequently admits $b$.
 \begin{align*}
     b \in \text{p}(I) &\rightarrow \Inputs{b} \setminus I \subseteq \text{p}(I)\quad &(\text{P1})\\
     &\rightarrow \Inputs{b} \setminus I \subseteq \text{p}(J) \quad &(\text{Induction}) \\
@@ -206,7 +216,7 @@ $I\subseteq J \rightarrow \text{p}(I)\subseteq\text{p}(J)$.
 \end{align*}
 \end{proof}
 
-To represent a discrete dynamical system, let $V_t$ denote the set of blocks which have values propagated to them at time $t$. For a set of initial conditions $I$, $V_0 := \text{p}(I)$ and $V_{t+1} := \text{p}(\{b\mid b\in I \land b\in V_t\})$. That is, if a block with an initial value receives a new value during propagation, the new value is its value at time $t+1$ and propagation is performed again to compute the values of other blocks at $t+1$.
+To represent a dynamical system, let $V_t$ denote the set of blocks which have values propagated to them at time $t$. For a set of initial conditions $I$, $V_0 := \text{p}(I)$ and $V_{t+1} := \text{p}(\{b\mid b\in I \land b\in V_t\})$. That is, if a block with an initial value receives a new value during propagation, the new value is its value at time $t+1$ and propagation is performed again to compute the values of other blocks at $t+1$.
 
 \begin{lemma}\label{lem:fixedpoint}
     $\exists t V_{t+1}\equiv V_t \leftrightarrow \forall n>0, V_{t+n}\equiv V_t$.
@@ -248,6 +258,35 @@ If a fixed point is reached during propagation and $V_t\not\equiv\varnothing$, t
 \State \Return $L$
 \end{algorithmic}
 \end{algorithm}
+
+\begin{figure*}
+\[
+\xymatrix{
+    a \ar@/^/[r] \ar@/_/@{<-}[r] \ar@/_/@{<-}[dr] & b & {\begin{aligned}
+        &S=\{c\} \\
+        &L=\text{empty list}
+    \end{aligned}} &
+    *++[o][F=]{a} \ar@/^/[r] \ar@/_/@{<-}[r] \ar@/_/@{<-}[dr] & b & {\begin{aligned}
+        &S=\{a\} \\
+        &L=[c]
+    \end{aligned}} \\
+    1. & *++[o][F=]{c} \ar@(r, u)[] &
+    &2.& *++[o][F]{c} \ar@(r, u)[] \\
+    *++[o][F]{a} \ar@/^/[r] \ar@/_/@{<-}[r] \ar@/_/@{<-}[dr] & *++[o][F=]{b} & {\begin{aligned}
+        &S=\{b\} \\
+        &L=\text[c, a]
+    \end{aligned}} &
+    *++[o][F]{a} \ar@/^/[r] \ar@/_/@{<-}[r] \ar@/_/@{<-}[dr] & *++[o][F]{b} & {\begin{aligned}
+        &S=\varnothing \\
+        &L=[c, a, b]
+    \end{aligned}} \\
+    3. & *++[o][F]{c} \ar@(r, u)[] &
+    & 4. & *++[o][F]{c} \ar@(r, u)[] \\
+}
+\]
+    \caption{Visualizing Algorithm \ref{alg:propogation}'s execution.}
+    \label{fig:alg1example2}
+\end{figure*}
 
 \begin{figure}[H]
 \[
@@ -484,7 +523,13 @@ However, in this system of equations we can express the value of $x_c$ two ways:
 
 \section{Conclusion}\label{sec:conclusion}
 
-We've discussed how to represent and execute block diagrams of dynamical systems. Section \ref{sec:execution} explored how to statically determine the execution order of a block diagram, then showed how to compile it to an imperative program. Section \ref{sec:soundness} showed how to statically detect potentially problematic initial conditions on a diagram. Future work could explore how to exploit opportunities for parallelism in diagram execution and integrate this work into modeling and simulation software like \cite{cadCAD.jl}.
+We've discussed how to represent and execute block diagrams of dynamical systems. Section \ref{sec:execution} explored how to statically determine the execution order of a diagram, then showed how to compile it to an imperative program. Afterwards, Section \ref{sec:soundness} showed how to statically detect potentially problematic initial conditions on a diagram. Together, this provides the theoretical basis for an implementation of a software library for simulating dynamical systems. Though practical questions and remain.
+
+For one, not all blocks can be wired together. A block which outputs numbers can't reasonably be wired to one which takes a string as input. However, in the case where blocks are implemented in a typed language, the type system ought to catch these errors when compiling the imperative program generated in Section \ref{sec:execution}.
+
+Second, it is practically difficult to enforce that execution order doesn't change the behavior of the system. For example, consider Figure \ref{fig:parallel}. If blocks $b$ and $c$ take a filename as input and write a value to the file depending on its contents, then the execution orders $a$,$b$,$c$ and $a$,$c$,$b$ could result in different outputs. Furthermore, if $a$'s output is random and difficult to copy, then there are many subtleties in ensuring $b$ and $c$ receive the same input on each iteration.
+
+Finally, when multiple execution orders are possible as in Figure \ref{fig:multi-order} and \ref{fig:parallel}, it is possible to execute blocks in parallel. Determining when and how to exploit opportunities for parallelism is an interesting question left unaddressed in this essay.
 
 \begin{figure}[h]
 \[
@@ -494,7 +539,7 @@ b \\
 }
 \]
     \caption{Blocks $b$ and $c$ can be executed in parallel.}
-    \label{fig:soundness}
+    \label{fig:parallel}
 \end{figure}
 
 \printbibliography
