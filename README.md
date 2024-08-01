@@ -11,3 +11,9 @@ details.
 This project is a work in progress, we expect future work will
 integrate these analysis techniques into
 [cadCAD](https://github.com/cadCAD-org/cadCAD.jl).
+
+
+[basic-executor.jl](basic-executor.jl) contains a very simple block
+diagram execution library based on the semantics described in the
+essay. It performs no validation, but on valid diagrams should produce
+the same results as a fully functional one.

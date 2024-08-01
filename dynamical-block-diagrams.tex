@@ -1,5 +1,5 @@
 \documentclass[twocolumn]{article}
-\usepackage{xypic}
+\usepackage[all]{xy}
 \usepackage{graphicx}
 \usepackage{enumerate}
 \usepackage{amssymb}
@@ -8,8 +8,7 @@
 \usepackage{amsmath}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
-\usepackage{subcaption}
-\usepackage[section]{placeins}
+\usepackage{fontawesome}
 \usepackage[hidelinks]{hyperref}
 \usepackage[normalem]{ulem}
 
@@ -32,7 +31,7 @@ We describe a way block diagrams can be used to model dynamical systems. In Sect
 
 \subsection{Block Diagrams}
 
-A block diagram is a set of blocks $B$ and a relation $W$ over $B$. If $(a, b)\in W$, then there is an arrow from block $a$ to block $b$. 
+A block diagram is a set of blocks $B$ and a relation $W$ over $B$. If $(a, b)\in W$, then there is an arrow from block $a$ to block $b$.
 
 
 \begin{figure}[h]
@@ -117,13 +116,11 @@ Care must be taken when placing initial values on Figure \ref{fig:v2dynamical}. 
     \label{fig:meow}
 \end{figure}
 
-When a value is placed on only $h$, $f$ doesn't receive a value. As for $f$ to take on a value, all of $f$'s inputs must have a value, but $f\in\Inputs{f}$ and $f\not\in I$, so not all of $f$'s inputs have a value. As not all blocks take on values, we say the diagram is under-determined with these initial conditions.
+When a value is placed on only $u$, what should the next output of $f$ be? $f(\underline{\hspace{0.3cm}}, x_u)$? As $f$'s next value circularly depends on its previous one, and no initial value is provided, we say $f$ does not take on a value. As not all blocks take on values, we say the diagram is under-determined with these initial conditions.
 
-When a value is placed on both $u$ and $f$, let $x_f$ denote the initial value of $f$ and $x_u$ the initial value of $u$. The first output of $f$ is then $f(x_f, x_u)$, but it is expected to be $f(x_f, u(h(x_f)))$. Without executing the diagram, we can't determine if $x_u\equiv u(h(x_f))$, so we would like to reject these initial conditions and say the diagram is over-determined.
+When a value is placed on both $u$ and $f$, let $x_f$ denote the initial value of $f$ and $x_u$ the initial value of $u$. As all of $f$'s inputs have values, suppose $f$ is executed next \footnote{\label{footnote} One could argue $h$ should be executed next, then $u$. In which case, what happens to the previous output of $u$, $x_u$? Is it overridden? In which case we get $f(x_f, u(h(x_f)))$ as desired. Is the new output added to a queue? Either way, we would like to reject initializations with overridden values and queues.}. The first output of $f$ is then $f(x_f, x_u)$, but it is expected to be $f(x_f, u(h(x_f)))$. Without executing the diagram, we can't determine if $x_u\equiv u(h(x_f))$, so we would like to reject these initial conditions and say the diagram is over-determined.
 
-For another perspective on over-determined diagrams, consider $\xymatrix@1{*++++[o][F=]{a} \ar@/^/[r] & *++++[o][F=]{e} \ar@/^/[l]}$. Here, all of the inputs for $a$ and $e$ are available, so we can choose to execute either first. Letting $x_a$ and $x_e$ denote the initial values of $a$ and $e$ respectively: If $a$ is executed then $e$, the value output by $e$ is $e(a(x_e))$. However, if $e$ is executed first, the value outputted is $e(x_a)$. Without evaluating the blocks, we can't be sure $e(x_a)$ is equal to $e(a(x_e))$. So we say the diagram is unsound, as two seemingly valid execution orders can result in different outputs from the blocks.
-
-In Section \ref{sec:soundness} we explore how to detect over and under-determined initial conditions.
+Section \ref{sec:soundness} explores how to detect over and under-determined initial conditions. Section \ref{sec:related-work} discusses related work and how over-determinedness is similar to Synchronous Kahn Networks \cite{SyncKahn}, which disallow multiple values being in a queue as discussed in \textsuperscript{\ref{footnote}}. However our definition is more restrictive, as a Synchronous Kahn Network would admit the over-determined initialization of Figure \ref{fig:meow} using the execution order $h$, then $f$, then $u$.
 
 \section{Execution}\label{sec:execution}
 
@@ -206,7 +203,7 @@ $I\subseteq J \rightarrow \text{p}(I)\subseteq\text{p}(J)$.
 \end{lemma}
 \begin{proof}
     Intuitively, decreasing the number of blocks with initial values will not increase the number of blocks which receive values during propagation. Formally, let $F$ be the property $b\in \text{p}(I)\rightarrow b\in\text{p}(J)$. Evidently, if $F$ is true, then $\text{p}(I)\subseteq\text{p}(J)$.
-    
+
     Base case, when $\text{p}(I)\equiv\varnothing$, $F$ is vacuously true. For the inductive step, assume $F$ holds before the application of (P1) and (P1) subsequently admits $b$.
 \begin{align*}
     b \in \text{p}(I) &\rightarrow \Inputs{b} \setminus I \subseteq \text{p}(I)\quad &(\text{P1})\\
@@ -248,7 +245,7 @@ If a fixed point is reached during propagation and $V_t\not\equiv\varnothing$, t
     \State $b \gets$ any element of $S$
     \State $L \gets L\cup b$
     \State $S \gets S\setminus b$
-    
+
     \For{each $b'$ where $b\in\Inputs{b'}$}
         \If{$b'\not\in L\land\Inputs{b'}\subseteq L$}
             \State $S \gets S\cup b'$
@@ -444,7 +441,7 @@ This being true means requiring each block with an initial value to feed back in
   By induction on the length of the path. For a path of length one, $(a, b)\in W$ so by definition $a\in\Inputs{b}$. So as $a\not\in I$, $a\in\Inputs{b}\setminus I$. Thus, by (P1) $b\in\text{p}(I)\rightarrow \Inputs{b}\setminus I\subseteq\text{p}(I)\rightarrow a\in\text{p}(I)$. For a path of length greater than one, $(a, b)\not\in W$ so
   \[
   \begin{aligned}
-      \text{up}(a, b, I)\land &b\in\text{p}(I)  \\ 
+      \text{up}(a, b, I)\land &b\in\text{p}(I)  \\
       &\rightarrow \exists b'\in\Inputs{b}\setminus I, \text{up}(a, b', I) \land \Inputs{b}\setminus I\subseteq\text{p}(I) \\
       &\rightarrow \text{up}(a, b', I) \land b'\in\text{p}(I) \\
       &\rightarrow a\in\text{p}(I) \quad\quad\text{(Inductive hypothesis).}
@@ -523,13 +520,24 @@ However, in this system of equations we can express the value of $x_c$ two ways:
 
 \section{Conclusion}\label{sec:conclusion}
 
-We've discussed how to represent and execute block diagrams of dynamical systems. Section \ref{sec:execution} explored how to statically determine the execution order of a diagram, then showed how to compile it to an imperative program. Afterwards, Section \ref{sec:soundness} showed how to statically detect potentially problematic initial conditions on a diagram. Together, this provides the theoretical basis for an implementation of a software library for simulating dynamical systems. Though practical questions and remain.
+We've discussed how to represent and execute block diagrams of dynamical systems. Section \ref{sec:execution} explored how to statically determine the execution order of a diagram, then showed how to compile it to an imperative program. Afterwards, Section \ref{sec:soundness} showed how to statically detect problematic initial conditions on a diagram. Together, this provides the conceptual basis for an implementation of a software library for simulating dynamical systems. Though practical considerations and remain.
 
-For one, not all blocks can be wired together. A block which outputs numbers can't reasonably be wired to one which takes a string as input. However, in the case where blocks are implemented in a typed language, the type system ought to catch these errors when compiling the imperative program generated in Section \ref{sec:execution}.
+\begin{enumerate}
+    \item Not all blocks can be connected. A block which outputs numbers can't be wired to one which takes a string as input. However, in the case where blocks are implemented in a typed language, the type system ought to catch these errors when compiling the imperative program generated in Section \ref{sec:execution}.
 
-Second, it is practically difficult to enforce that execution order doesn't change the behavior of the system. For example, consider Figure \ref{fig:parallel}. If blocks $b$ and $c$ take a filename as input and write a value to the file depending on its contents, then the execution orders $a$,$b$,$c$ and $a$,$c$,$b$ could result in different outputs. Furthermore, if $a$'s output is random and difficult to copy, then there are many subtleties in ensuring $b$ and $c$ receive the same input on each iteration.
+    \item It is difficult to ensure execution order doesn't change the behavior of the system. For example, consider Figure \ref{fig:parallel}. If blocks $b$ and $c$ append to a file, the order they are executed in will change its contents.
 
-Finally, when multiple execution orders are possible as in Figure \ref{fig:multi-order} and \ref{fig:parallel}, it is possible to execute blocks in parallel. Determining when and how to exploit opportunities for parallelism is an interesting question left unaddressed in this essay.
+    \item  When multiple execution orders are possible as in Figures \ref{fig:multi-order} and \ref{fig:parallel}, blocks can be executed in parallel. When and how to exploit these opportunities is an open question.
+
+    \item In a predator-prey model like $\xymatrix@1{\text{fish} \ar@/^/[r] & \text{shark} \ar@/^/[l]}$ where wires carry the location of a fish and shark, our initialization rules say specifying both locations is over-determined. However, this is resolved by observing the fish and shark update their positions based on their current state as well as their counterpart's, resulting in
+
+    \[
+    \xymatrix@1{\text{fish} \ar@(l, u)[] \ar@/^/[r] & \text{shark} \ar@(r, u)[] \ar@/^/[l]}
+    \]
+
+    Thus, internal state should represented as feedback in a software implementation.
+
+\end{enumerate}
 
 \begin{figure}[h]
 \[
