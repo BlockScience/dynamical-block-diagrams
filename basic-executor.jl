@@ -1,101 +1,110 @@
-# This is a simple block diagram executor which is subsequentally
-# configured to run the diagram described here:
+# This is a simple block diagram executor which is configured to
+# simulate the diagram described here:
 #
 # https://hackmd.io/@ekez/HJTHYT8NA
 #
-
 # This does not compute execution order ahead of time, nor validate
 # initial conditions. Though valid diagrams run with this executor
 # ought to have the same behavior as a fully functional one.
 
 using Random
 
-mutable struct Node{Space}
-    space::Type
-    value::Union{Space, Nothing}
+mutable struct Wire
+    value::Any
     initialized::Bool
     time::UInt
-    function Node(t::Type)
-        new{t}(t, nothing, false, 0)
+    function Wire()
+        new(nothing, false, 0)
     end
 end
 
 struct Block
-    terminals::Vector{Ref{Node}}
-    terminaltypes::Vector{Type}
-    port::Ref{Node}
+    inputs::Vector{Ref{Wire}}
+    output::Ref{Wire}
     logic::Function
-    name::String
-    function Block(terminaltypes, port, logic, name)
-        terminals = Vector{Ref{Node}}(undef, length(terminaltypes))
-        new(terminals, terminaltypes, Node(port), logic, name)
+    function Block(logic)
+        inputs = length(first(methods(logic)).sig.parameters)-1
+        inputs = Vector{Ref{Wire}}(undef, inputs)
+        new(inputs, Wire(), logic)
     end
 end
 
-function wire(port, block, terminal)
-    @assert isa(port[].space, typeof(block.terminaltypes[terminal]))
-    block.terminals[terminal] = port
+function wire(output, block, terminal)
+    block.inputs[terminal] = output
 end
 
 function initialize(block, value)
-    @assert isa(value, block.port[].space)
-    block.port[].value = value
-    block.port[].time = 1
-    block.port[].initialized = true
+    block.output[].value = value
+    block.output[].time = 1
+    block.output[].initialized = true
 end
 
-cartesian2radius = Block([Int, Int], Real, (x, y) -> sqrt(x*x + y*y), "c2r")
-cartesian2theta = Block([Int, Int], Real, (x, y) -> atan(y, x), "c2t")
-addDelta = Block([Real], Real, (theta) -> theta + rand()*2*pi, "Δ")
-polar2x = Block([Real, Real], Int, (r, th) -> trunc(Int, r * cos(th)), "p2x")
-polar2y = Block([Real, Real], Int, (r, th) -> trunc(Int, r * sin(th)), "p2y")
+cartesian2radius = Block((x, y) -> sqrt(x*x+y*y))
+cartesian2theta = Block((x, y) -> atan(y, x))
+addDelta = Block((theta) -> theta + rand()*2*pi)
+polar2x = Block((r, th) -> trunc(Int, r*cos(th)))
+polar2y = Block((r, th) -> trunc(Int, r*sin(th)))
 
 blocks = [cartesian2radius, cartesian2theta, addDelta, polar2x, polar2y]
 
-wire(cartesian2theta.port, addDelta, 1)
-wire(cartesian2radius.port, polar2x, 1)
-wire(cartesian2radius.port, polar2y, 1)
-wire(addDelta.port, polar2x, 2)
-wire(addDelta.port, polar2y, 2)
-wire(polar2x.port, cartesian2radius, 1)
-wire(polar2y.port, cartesian2radius, 2)
-wire(polar2x.port, cartesian2theta, 1)
-wire(polar2y.port, cartesian2theta, 2)
+wire(cartesian2theta.output, addDelta, 1)
+wire(cartesian2radius.output, polar2x, 1)
+wire(cartesian2radius.output, polar2y, 1)
+wire(addDelta.output, polar2x, 2)
+wire(addDelta.output, polar2y, 2)
+wire(polar2x.output, cartesian2radius, 1)
+wire(polar2y.output, cartesian2radius, 2)
+wire(polar2x.output, cartesian2theta, 1)
+wire(polar2y.output, cartesian2theta, 2)
 
 initialize(cartesian2radius, 500)
 initialize(cartesian2theta, 0)
 
-## Uncommenting this will lead to an over-determined initialiation.
-# addDelta.port[].value = 1
-# addDelta.port[].time = 1
-
-while cartesian2radius.port[].value > 0
+# Every wire has a timestamp. At time=0, wires have no value. Every
+# time the value on a wire changes its timestamp is incremented.
+#
+# For a block with an initial value, once all of its inputs have the
+# same timestamp as its output, a new value can be computed. For a
+# block without an initial value, once all of its inputs have
+# timestamps greater than its output, a new value can be
+# computed.
+#
+# This corresponds to the propogation logic of
+# dynamical-block-diagrams.pdf: blocks with initial values advance
+# their timestep if all of their inputs receive values during
+# propogation. Other blocks advance their timestep in response to
+# their inputs having advanced timesteps.
+#
+# The execution logic randomly selects and executes a block if it is
+# executable, repeating until the radius has become zero. A complete
+# implementation of dynamical-block-diagrams.pdf would use Algorithm 2
+# to pre-determine the execution order so no guessing was needed.
+while cartesian2radius.output[].value > 0
   b = rand(blocks)
-  v = []
   g = true
-  if b.port[].initialized
-    for n in b.terminals
-      if n[].time != b.port[].time
+  if b.output[].initialized
+    for n in b.inputs
+      if n[].time != b.output[].time
         g = false
       end
     end
   else
-    for n in b.terminals
-      if n[].time <= b.port[].time
+    for n in b.inputs
+      if n[].time <= b.output[].time
         g = false
       end
     end
   end
   if g
     v = []
-    for n in b.terminals
+    for n in b.inputs
       push!(v, n[].value)
     end
     y = b.logic(v...)
-    b.port[].value = y
-    b.port[].time += 1
-    if b.name == "c2r"
-      println(b.port[].value)
+    b.output[].value = y
+    b.output[].time += 1
+    if b == cartesian2radius
+      println(b.output[].value)
     end
   end
 end
