@@ -1,81 +1,153 @@
+module cadCAD
+
+struct Wire
+    from::String
+    to::String
+    index::Int64
+end
+
 struct Diagram
-    blocks::Dict{String,Any}
+    blocks::Dict{String,Function}
+    wires::Set{Wire}
+    initialization::Dict{String,Any}
+
     function Diagram()
-        new(Dict())
+        new(Dict(), Set(), Dict())
     end
 end
 
-mutable struct Wire
-    value::Any
-    initialized::Bool
-    time::UInt
-    function Wire()
-        new(nothing, false, 0)
+function inputs(d::Diagram, b::String)
+    v = []
+    for w in d.wires
+        if w.to == b
+            push!(v, w)
+        end
     end
+    map(w -> w.from, sort(v, by=w -> w.index))
 end
 
-mutable struct Block
-    inputs::Vector{Ref{Wire}}
-    output::Ref{Wire}
-    logic::Function
-    function Block(d::Diagram, name::String, logic::Function)
-        inputs = length(first(methods(logic)).sig.parameters) - 1
-        inputs = Vector{Ref{Wire}}(undef, inputs)
-        b = new(inputs, Wire(), logic)
-        d.blocks[name] = b
-        b
+function outputs(d::Diagram, b::String)
+    v = []
+    for o in keys(d.blocks)
+        if b in inputs(d, o)
+            push!(v, o)
+        end
     end
+    v
 end
 
-# e: "{name}->{name}.{argument}"
-function wire(d::Diagram, e::String)
-    e = split(e, "->")
-    from = String(first(e))
-    e = split(e[2], ".")
-    to = String(first(e))
-    terminal = e[2]
-    args = Base.method_argnames(first(methods(d.blocks[to].logic)))[2:end]
-    terminal = findfirst(==(Symbol(terminal)), args)
-    wire(d, from, to, terminal)
+function block!(d::Diagram, name::String, logic::Function)
+    d.blocks[name] = logic
 end
 
-function wire(d::Diagram, from::String, to::String, terminal::Int64)
-    from = d.blocks[from]
-    to = d.blocks[to]
-    to.inputs[terminal] = from.output
+function wire!(d::Diagram, e::String)
+    function p(e::String)
+        e = split(e, "->")
+        from = String(e[1])
+        e = split(e[2], ".")
+        to = String(e[1])
+        terminal = e[2]
+        from, to, terminal
+    end
+
+    from, to, terminal = p(e)
+    index = findfirst(
+        ==(Symbol(terminal)),
+        Base.method_argnames(methods(d.blocks[to])[1])[2:end]
+    )
+    index = index === nothing ? tryparse(Int, terminal) : index
+    @assert index !== nothing "wiring to nonexistant location ($to.$terminal)"
+    push!(d.wires, Wire(from, to, index))
 end
 
-function initialize(d::Diagram, block::String, value)
-    block = d.blocks[block]
-    block.output[].value = value
-    block.output[].time = 1
-    block.output[].initialized = true
+function initialize!(d::Diagram, block::String, value)
+    @assert haskey(d.blocks, block) "initializing nonexistant block ($block)"
+    d.initialization[block] = value
 end
 
-function execute(d::Diagram, steps::Int64)
-    stop = (x...) -> (steps -= 1) <= 0
-    execute(d, stop)
-end
-
-function execute(d::Diagram, stop::Function)
-    while true
-        name, b = rand(d.blocks)
-        go = true
+function execute!(d::Diagram, steps::Int64)
+    function propogate(d::Diagram, I::Set)
+        B = keys(d.blocks)
+        S = Set([b for b in B if inputs(d, b) ⊆ I && length(inputs(d, b)) > 0])
+        L = []
+        while length(S) > 0
+            b = rand(S)
+            push!(L, b)
+            delete!(S, b)
+            for n in outputs(d, b)
+                if n ∉ L && setdiff(inputs(d, n), I) ⊆ L
+                    push!(S, n)
+                end
+            end
+        end
+        L
+    end
+    function order(d::Diagram, I::Set)
+        V_t = propogate(d, I)
+        L = []
+        while true
+            V_tp = propogate(d, Set([b for b in V_t if b in I]))
+            if length(V_tp) == 0
+                return [L; V_t], []
+            end
+            if Set(V_tp) == Set(V_t)
+                return L, V_t
+            end
+            L = [L; V_t]
+            V_t = V_tp
+        end
+    end
+    function compileSequence(order, I)
         v = []
-        i = b.output[].initialized
-        for n in b.inputs
-            if (i && n[].time != b.output[].time) || (!i && n[].time <= b.output[].time)
-                go = false
-                break
+        xps = []
+        for b in order
+            args = map(name -> "x_$name", inputs(d, b))
+            args = join(args, ", ")
+            call = "$b($args)"
+            assignment = "x_$b"
+            if b in I
+                assignment = "xp_$b"
+                push!(xps, b)
             end
-            push!(v, n[].value)
+            push!(v, "$assignment = $call")
         end
-        if go
-            b.output[].value = b.logic(v...)
-            b.output[].time += 1
-            if stop(name, b.output[].value)
-                break
-            end
+        for b in xps
+            push!(v, "x_$b = xp_$b")
         end
+        join(v, "\n")
     end
+    function compileFunction(d, I, steps)
+        setup, loop = map(o -> compileSequence(o, I), order(d, I))
+        loop = "  " * replace(loop, "\n" => "\n  ")
+        body = strip("$setup\nsteps=$steps\nwhile (steps -= 1) >= 0\n$loop\nend")
+        body = "  " * replace(body, "\n" => "\n  ")
+        args = join([sort(collect(keys(d.blocks))); map(b -> "x_$b", sort(collect(I)))], ", ")
+        "function execute_diagram($args)\n$body\nend"
+    end
+
+    I = Set(keys(d.initialization))
+    fn = compileFunction(d, I, steps)
+    eval(Meta.parse(fn))
+    args = [
+        map(b -> d.blocks[b], sort(collect(keys(d.blocks))));
+        map(i -> d.initialization[i], sort(collect(I)))
+    ]
+
+    @invokelatest execute_diagram(args...)
+end
+
+# --- metrics --- #
+
+passthru = (f, g) -> (v...) -> (y -> (g(y); y))(f(v...))
+
+function print!(d::Diagram, block::String)
+    f = d.blocks[block]
+    d.blocks[block] = passthru(f, println)
+end
+
+function collect!(d::Diagram, block::String, into::Vector{Any})
+    f = d.blocks[block]
+    d.blocks[block] = passthru(f, x -> push!(into, x))
+end
+
 end
