@@ -1,28 +1,24 @@
-![](https://github.com/user-attachments/assets/9518167d-cb81-4cd9-bc31-e3a18526bfe7)
+  <img src="https://github.com/user-attachments/assets/9518167d-cb81-4cd9-bc31-e3a18526bfe7" width="400px" />
 
 What are these fish doing?
 
 At the level of detail we're interested in, each fish considers where it is, where the shark is, and decides where to move next. The shark does the same thing looking for the fish. Here's an illustration:
 
-<p align="center">
   <img src="https://percisely.xyz/fish-diagrams/xymatrix_0.svg" />
-</p>
 
 What do we need to know to start simulating this? Knowing only the initial position of the fish is insufficient, as to calculate the next position of the fish we need to know the position of the shark. The same can be said about knowing only the initial position of the shark. So, to simulate this system we need to know the initial position of the fish and shark.
 
-![](https://github.com/user-attachments/assets/f23e4125-035f-43be-b834-7ce37019a824)
+  <img src="https://github.com/user-attachments/assets/f23e4125-035f-43be-b834-7ce37019a824" width="400px" />
 
 Now its night time. These fish are avoiding the dots, but they can't see very well.
 
 Each fish considers where it is, what dots are in its vision, and decides where to move next. The dots consider where they are and don't move. Determining what dots are in a fish's vision requires knowing where the fish is and where the dots are. Here's an illustration:
 
-<p align="center">
   <img src="https://percisely.xyz/fish-diagrams/xymatrix_1.svg" />
-</p>
 
 But what if we also provide the initial vision? If it isn't consistent with the initial position of the fish, the system will behave strangely. The drawing below shows a fish who's vision isn't initialized at the correct position.
 
-![image](https://github.com/user-attachments/assets/b1f8940a-6437-4b25-8d05-b7823a7ee7ca)
+  <img src="https://github.com/user-attachments/assets/b1f8940a-6437-4b25-8d05-b7823a7ee7ca" width="400px" />
 
 So we'd like to know, given a drawing like the ones above:
 
