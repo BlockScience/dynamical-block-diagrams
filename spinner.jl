@@ -1,7 +1,5 @@
 include("cadCAD.jl")
 
-import .cadCAD: Diagram, block!, wire!, initialize!, execute!, collect!
-
 spinner = Diagram()
 
 block!(spinner, "c2r", (x, y) -> sqrt(x * x + y * y))
@@ -26,7 +24,7 @@ collect!(spinner, "c2r", trajectory)
 initialize!(spinner, "c2r", 500)
 initialize!(spinner, "c2Θ", 0)
 
-execute!(spinner, 1000)
+execute(spinner, 1000)
 
 using UnicodePlots
 print(lineplot(trajectory, color=:black))

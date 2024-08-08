@@ -1,9 +1,8 @@
-include("cadCAD.jl")
-using .cadCAD: Diagram, block!, wire!, initialize!, collect!, execute!
+include("./cadCAD.jl")
 
 network = Diagram()
 
-nAgents = 20
+nAgents = 42
 ϵ = 1 / 11 - 1 / 12
 
 # Create and wire agents to themselves.
@@ -26,22 +25,22 @@ end
 
 # Initialize agents.
 for i in 1:nAgents
-    initialize!(network, "agent$i", rand(1:42))
+    initialize!(network, "agent$i", rand(1:1000))
 end
 
-# Collect agent trajectories into matrix.
-outputs = []
+# store (agent) -> trajectory
+trajectories = []
 for i in 1:nAgents
-    push!(outputs, [])
-    collect!(network, "agent$i", outputs[i])
+    push!(trajectories, [])
+    collect!(network, "agent$i", trajectories[i])
 end
 
-execute!(network, 500)
+execute(network, 1000)
 
 # Plot agent trajectories.
 using UnicodePlots
-plt = lineplot(outputs[1], color=:black)
-for i in 2:length(outputs)
-    lineplot!(plt, outputs[i], color=:black)
+plt = lineplot(trajectories[1], color=:black)
+for i in 2:length(trajectories)
+    lineplot!(plt, trajectories[i], color=:black)
 end
 print(plt)

@@ -31,7 +31,7 @@ We describe a way block diagrams can be used to model dynamical systems. In Sect
 
 \subsection{Block Diagrams}
 
-A block diagram is a set of blocks $B$ and a relation $W$ over $B$. If $(a, b)\in W$, then there is an arrow from block $a$ to block $b$.
+A block diagram is a set of blocks $B$ and a relation $W$ over $B$. If $(a, b)\in W$, then there is an arrow from block $a$ to block $b$. 
 
 
 \begin{figure}[h]
@@ -203,7 +203,7 @@ $I\subseteq J \rightarrow \text{p}(I)\subseteq\text{p}(J)$.
 \end{lemma}
 \begin{proof}
     Intuitively, decreasing the number of blocks with initial values will not increase the number of blocks which receive values during propagation. Formally, let $F$ be the property $b\in \text{p}(I)\rightarrow b\in\text{p}(J)$. Evidently, if $F$ is true, then $\text{p}(I)\subseteq\text{p}(J)$.
-
+    
     Base case, when $\text{p}(I)\equiv\varnothing$, $F$ is vacuously true. For the inductive step, assume $F$ holds before the application of (P1) and (P1) subsequently admits $b$.
 \begin{align*}
     b \in \text{p}(I) &\rightarrow \Inputs{b} \setminus I \subseteq \text{p}(I)\quad &(\text{P1})\\
@@ -245,9 +245,9 @@ If a fixed point is reached during propagation and $V_t\not\equiv\varnothing$, t
     \State $b \gets$ any element of $S$
     \State $L \gets L\cup b$
     \State $S \gets S\setminus b$
-
+    
     \For{each $b'$ where $b\in\Inputs{b'}$}
-        \If{$b'\not\in L\land\Inputs{b'}\subseteq L$}
+        \If{$b'\not\in L\land\Inputs{b'}\setminus I \subseteq L$}
             \State $S \gets S\cup b'$
         \EndIf
     \EndFor
@@ -441,7 +441,7 @@ This being true means requiring each block with an initial value to feed back in
   By induction on the length of the path. For a path of length one, $(a, b)\in W$ so by definition $a\in\Inputs{b}$. So as $a\not\in I$, $a\in\Inputs{b}\setminus I$. Thus, by (P1) $b\in\text{p}(I)\rightarrow \Inputs{b}\setminus I\subseteq\text{p}(I)\rightarrow a\in\text{p}(I)$. For a path of length greater than one, $(a, b)\not\in W$ so
   \[
   \begin{aligned}
-      \text{up}(a, b, I)\land &b\in\text{p}(I)  \\
+      \text{up}(a, b, I)\land &b\in\text{p}(I)  \\ 
       &\rightarrow \exists b'\in\Inputs{b}\setminus I, \text{up}(a, b', I) \land \Inputs{b}\setminus I\subseteq\text{p}(I) \\
       &\rightarrow \text{up}(a, b', I) \land b'\in\text{p}(I) \\
       &\rightarrow a\in\text{p}(I) \quad\quad\text{(Inductive hypothesis).}
@@ -530,13 +530,13 @@ We've discussed how to represent and execute block diagrams of dynamical systems
     \item  When multiple execution orders are possible as in Figures \ref{fig:multi-order} and \ref{fig:parallel}, blocks can be executed in parallel. When and how to exploit these opportunities is an open question.
 
     \item In a predator-prey model like $\xymatrix@1{\text{fish} \ar@/^/[r] & \text{shark} \ar@/^/[l]}$ where wires carry the location of a fish and shark, our initialization rules say specifying both locations is over-determined. However, this is resolved by observing the fish and shark update their positions based on their current state as well as their counterpart's, resulting in
-
+    
     \[
     \xymatrix@1{\text{fish} \ar@(l, u)[] \ar@/^/[r] & \text{shark} \ar@(r, u)[] \ar@/^/[l]}
     \]
 
     Thus, internal state should represented as feedback in a software implementation.
-
+    
 \end{enumerate}
 
 \begin{figure}[h]
