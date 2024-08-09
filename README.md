@@ -5,11 +5,39 @@ systems can be executed by a computer program.
   formalizes the problem and provides algorithms for executing and
   validating diagrams.
 - [cadCAD.jl](/cadCAD.jl) contains a software implementation of the
-  execution algorithms. [spinner.jl](spinner.jl) and
-  [consensus-networks.jl](consensus-networks.jl) contain example
-  models.
+  execution algorithms.
 
-The rest of this document is an overview of the problem and examples.
+To see a demo predator-prey simulation, install UnicodePlots (`echo
+'using Pkg; Pkg.add("UnicodePlots")' | julia`), then run
+
+```
+% julia predator-prey.jl
+      ┌────────────────────────────────────────┐
+   30 │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡆⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⠀⠀⠀⠀⠀⠀│
+      │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡆⠀⠀⠀⠀⠀│
+      │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣸⡇⠀⠀⠀⠀⠀│
+      │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡞⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⢹⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⡇⠀⠀⠀⠀⠀│
+      │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⡇⠀⠀⠀⠀⠀│
+      │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⡇⠀⠀⠀⠀⠀│
+      │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⡇⠀⠀⠀⠀⠀│
+      │⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⡇⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⡇⡇⠀⠀⠀⠀⠀│
+      │⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠁⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⡏⢸⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⡇⠀⠀⠀⠀⠀│
+      │⣄⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⣧⡀⠀⠀⠀⠀⠀⠀⠀⠀⡇⢸⣄⠀⠀⠀⠀⠀⠀⠀⠀⢸⠀⣧⡀⠀⠀⠀⠀│
+      │⣿⡀⠀⠀⠀⠀⠀⠀⠀⢸⠀⣷⣇⠀⠀⠀⠀⠀⠀⠀⠀⡇⢸⣸⡀⠀⠀⠀⠀⠀⠀⠀⢸⠀⡇⣇⠀⠀⠀⠀│
+      │⡇⢧⠀⠀⠀⠀⠀⠀⠀⡞⠀⣿⢸⡀⠀⠀⠀⠀⠀⠀⢸⠁⢸⡇⣇⠀⠀⠀⠀⠀⠀⠀⡏⠀⣿⢸⡀⠀⠀⠀│
+      │⡇⠘⡆⠀⠀⠀⠀⠀⠀⡇⠀⣿⠀⢳⠀⠀⠀⠀⠀⠀⣸⠀⣸⡇⠘⡆⠀⠀⠀⠀⠀⢀⡇⢀⣿⠀⢧⠀⠀⠀│
+      │⡇⠀⠙⣆⠀⠀⠀⠀⣸⠁⢸⢹⠀⠈⢳⡀⠀⠀⠀⢀⡇⠀⡇⡇⠀⠙⣆⠀⠀⠀⠀⣸⠀⢸⢸⠀⠈⢳⡀⠀│
+    0 │⢳⣀⣀⣈⣓⣦⣤⣴⣃⣀⡼⠘⣆⣀⣀⣙⣲⣤⣤⣞⣀⣠⠇⢳⣀⣀⣈⣓⣦⣤⣴⣃⣀⡞⠘⣆⣀⣀⣙⣲│
+      └────────────────────────────────────────┘
+      ⠀0⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀1 000 000
+```
+
+[spinner.jl](spinner.jl) and
+[consensus-networks.jl](consensus-networks.jl) contain two other
+example models.
+
+The rest of this document is an overview of the problem and goes into
+more detail about the examples.
 
 <img src="https://github.com/user-attachments/assets/9518167d-cb81-4cd9-bc31-e3a18526bfe7" width="400px" />
 
